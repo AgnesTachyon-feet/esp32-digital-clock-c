@@ -1,0 +1,86 @@
+#include "clock_oled.h"
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+static const uint8_t *glyph(char c) {
+  static const uint8_t SPACE[5] = {0,0,0,0,0};
+  static const uint8_t COLON[5] = {0,0x36,0x36,0,0};
+  static const uint8_t DOT[5] = {0,0x60,0x60,0,0};
+  static const uint8_t DASH[5] = {8,8,8,8,8};
+  static const uint8_t SLASH[5] = {0x20,0x10,8,4,2};
+  static const uint8_t DIGITS[10][5] = {
+    {0x3e,0x51,0x49,0x45,0x3e}, {0,0x42,0x7f,0x40,0},
+    {0x42,0x61,0x51,0x49,0x46}, {0x21,0x41,0x45,0x4b,0x31},
+    {0x18,0x14,0x12,0x7f,0x10}, {0x27,0x45,0x45,0x45,0x39},
+    {0x3c,0x4a,0x49,0x49,0x30}, {1,0x71,9,5,3},
+    {0x36,0x49,0x49,0x49,0x36}, {6,0x49,0x49,0x29,0x1e}
+  };
+  static const uint8_t LETTERS[26][5] = {
+    {0x7e,0x11,0x11,0x11,0x7e}, {0x7f,0x49,0x49,0x49,0x36},
+    {0x3e,0x41,0x41,0x41,0x22}, {0x7f,0x41,0x41,0x22,0x1c},
+    {0x7f,0x49,0x49,0x49,0x41}, {0x7f,9,9,9,1},
+    {0x3e,0x41,0x49,0x49,0x7a}, {0x7f,8,8,8,0x7f},
+    {0,0x41,0x7f,0x41,0}, {0x20,0x40,0x41,0x3f,1},
+    {0x7f,8,0x14,0x22,0x41}, {0x7f,0x40,0x40,0x40,0x40},
+    {0x7f,2,0x0c,2,0x7f}, {0x7f,4,8,0x10,0x7f},
+    {0x3e,0x41,0x41,0x41,0x3e}, {0x7f,9,9,9,6},
+    {0x3e,0x41,0x51,0x21,0x5e}, {0x7f,9,0x19,0x29,0x46},
+    {0x46,0x49,0x49,0x49,0x31}, {1,1,0x7f,1,1},
+    {0x3f,0x40,0x40,0x40,0x3f}, {0x1f,0x20,0x40,0x20,0x1f},
+    {0x3f,0x40,0x38,0x40,0x3f}, {0x63,0x14,8,0x14,0x63},
+    {7,8,0x70,8,7}, {0x61,0x51,0x49,0x45,0x43}
+  };
+  if (c >= '0' && c <= '9') return DIGITS[c - '0'];
+  if (c >= 'a' && c <= 'z') c -= 'a'-'A';
+  if (c >= 'A' && c <= 'Z') return LETTERS[c - 'A'];
+  if (c == ':') return COLON;
+  if (c == '.') return DOT;
+  if (c == '-') return DASH;
+  if (c == '/') return SLASH;
+  return SPACE;
+}
+
+static bool oled_command(clock_oled_t *oled, uint8_t value) {
+    uint8_t data[2] = {0x00, value};
+    return clock_i2c_write(oled->bus, oled->device, data, sizeof(data));
+}
+bool clock_oled_init(clock_oled_t *oled, clock_i2c_t *bus) {
+    if (!oled || !bus) return false;
+    oled->bus = bus;
+    if (!clock_i2c_add_device(bus, 0x3c, &oled->device)) return false;
+    vTaskDelay(pdMS_TO_TICKS(50));
+    const uint8_t init_commands[] = {
+        0xae,0xd5,0x80,0xa8,0x3f,0xd3,0x00,0x40,0x8d,0x14,
+        0x20,0x02,0xa1,0xc8,0xda,0x12,0x81,0xcf,0xd9,0xf1,
+        0xdb,0x40,0xa4,0xa6,0x2e,0xaf
+    };
+    for (size_t i = 0; i < sizeof(init_commands); ++i)
+        if (!oled_command(oled, init_commands[i])) return false;
+    clock_oled_clear(oled);
+    return clock_oled_flush(oled);
+}
+void clock_oled_clear(clock_oled_t *oled) { memset(oled->buffer, 0, sizeof(oled->buffer)); }
+static void oled_pixel(clock_oled_t *oled, int x, int y) {
+    if (x < 0 || x >= 128 || y < 0 || y >= 64) return;
+    oled->buffer[x + (y/8)*128] |= (uint8_t)(1u << (y%8));
+}
+void clock_oled_text(clock_oled_t *oled, int x, int y, const char *message) {
+    if (!message) return;
+    for (; *message && x < 124; ++message, x += 6) {
+        const uint8_t *columns = glyph(*message);
+        for (int dx=0; dx<5; ++dx)
+            for (int dy=0; dy<7; ++dy)
+                if (columns[dx] & (1u << dy)) oled_pixel(oled, x+dx, y+dy);
+    }
+}
+bool clock_oled_flush(clock_oled_t *oled) {
+    for (uint8_t page=0; page<8; ++page) {
+        if (!oled_command(oled, 0xb0 | page) || !oled_command(oled, 0x00) ||
+            !oled_command(oled, 0x10)) return false;
+        uint8_t block[129] = {0x40};
+        memcpy(block + 1, oled->buffer + page*128, 128);
+        if (!clock_i2c_write(oled->bus, oled->device, block, sizeof(block))) return false;
+    }
+    return true;
+}
