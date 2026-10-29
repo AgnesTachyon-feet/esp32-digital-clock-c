@@ -1,16 +1,8 @@
 # ESP32 Modular Digital Clock — ESP-IDF / Wokwi
 
 Implementation derived from the two user-provided HTML examples:
-`wokwi_esp32_digital_clock_suite(1).html` and
-`wokwi_esp32_digital_clock_dashboard(1).html`.
-
-**Important:** This is ESP-IDF firmware written in **C only** (`.c` / `.h`), not C++ and not the JavaScript dashboard mockup.
-Static validation and host feature tests have passed. A firmware build and actual Wokwi
-runtime test still require a machine with ESP-IDF / Wokwi.
-
-## Language and architecture
-
-The source is deliberately **C, not C++**. ESP-IDF supports both languages, but this assignment uses C11, `typedef struct` for state, and procedural module interfaces instead of C++ classes or OOP. Four ESP-IDF components separate hardware, network time, user interface, and alarm/stopwatch. The reference HTML described C++ OOP; this implementation changes the programming paradigm while preserving the supported project goals.
+`wokwi_esp32_digital_clock_suite.html` and
+`wokwi_esp32_digital_clock_dashboard.html`.
 
 ## Features
 
@@ -46,9 +38,6 @@ Wokwi part IDs were corrected to official IDs:
 Extract the ZIP under your workspace. In a **Fedora host terminal**, change to the
 `esp32-digital-clock` folder and run:
 
-```bash
-bash scripts/build-docker.sh
-```
 
 This mounts the current project into Docker at `/project` using `:Z` for SELinux
 and builds with `espressif/idf:latest`. Unlike older examples, this multi-component
@@ -65,28 +54,10 @@ docker run --rm -it \
 idf.py build
 ```
 
-`latest` is not pinned, so `idf.py --version` and the real build log belong in
-submission evidence. Fix version mismatches against the actual installed IDF.
-
 ## Wokwi simulation
 
 For **Wokwi CLI or VS Code Wokwi extension**, the included `wokwi.toml` points to
 `build/flasher_args.json`, which includes application + bootloader + partitions.
-
-```bash
-wokwi-cli . --timeout 90000 --serial-log-file docs/wokwi-run.log
-```
-
-This firmware is designed to run continuously. A timeout exit by itself is not
-proof of a firmware failure. Inspect the serial log and screenshot the circuit.
-Do **not** include `WOKWI_CLI_TOKEN` in the report.
-
-**Wokwi Web:** A new ESP-IDF project is available at
-https://wokwi.com/projects/new/esp-idf-esp32 . Wokwi's web editor might not expose
-all component folders/project build settings. Do not assume pasting `app_main.c`
-only can reproduce this modular project. Prefer Docker + Wokwi CLI/extension for
-this multi-component version. If using the web editor, add all sources and
-CMake component manifests before attempting to compile.
 
 ## Interaction guide
 
@@ -98,13 +69,6 @@ CMake component manifests before attempting to compile.
 5. On SET RTC TIME, press SET to advance RTC by one minute. The next NTP sync
    may overwrite a manual adjustment.
 6. If alarm rings, press ALARM to silence it. It also times out after 10 seconds.
-
-## Testing / evidence
-
-`bash scripts/test-host.sh` runs JSON/TOML/topology checks plus host C11 tests of
-stopwatch and alarm logic. This **does not** replace an ESP-IDF compile or a
-hardware-simulation proof. See [REPORT.md](REPORT.md) for acceptance criteria,
-observed/static evidence, and missing proof.
 
 ## Known limitations
 
