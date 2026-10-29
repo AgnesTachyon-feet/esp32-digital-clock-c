@@ -1,4 +1,4 @@
-# ESP32 Modular Digital Clock — ESP-IDF / Wokwi
+# ESP32 Modular Digital Clock — ESP-IDF Wokwi
 
 Implementation derived from the two user-provided HTML examples:
 `wokwi_esp32_digital_clock_suite.html` and
@@ -29,35 +29,6 @@ Implementation derived from the two user-provided HTML examples:
 | LAP | GPIO5 | Stopwatch start/pause; long press reset |
 | Buzzer positive | GPIO25 | LEDC 2 kHz PWM |
 | Buzzer negative | GND | Common ground |
-
-Wokwi part IDs were corrected to official IDs:
-`board-esp32-devkit-c-v4`, `wokwi-ds1307`, `board-ssd1306`.
-
-## How to build with Docker (Fedora/Fish)
-
-Extract the ZIP under your workspace. In a **Fedora host terminal**, change to the
-`esp32-digital-clock` folder and run:
-
-
-This mounts the current project into Docker at `/project` using `:Z` for SELinux
-and builds with `espressif/idf:latest`. Unlike older examples, this multi-component
-project must be built from its root, not from `main/`.
-
-For a persistent interactive Bash session:
-
-```bash
-docker run --rm -it \
-  -v "$PWD:/project:Z" -w /project \
-  -u "$(id -u):$(id -g)" -e HOME=/tmp \
-  espressif/idf:latest bash
-# inside container:
-idf.py build
-```
-
-## Wokwi simulation
-
-For **Wokwi CLI or VS Code Wokwi extension**, the included `wokwi.toml` points to
-`build/flasher_args.json`, which includes application + bootloader + partitions.
 
 ## Interaction guide
 
